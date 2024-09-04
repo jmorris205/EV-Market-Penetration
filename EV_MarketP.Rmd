@@ -1,0 +1,166 @@
+---
+title: "Electric Vehicle Market Penetration by US County 2024"
+author: "Jonathan Morris, Youngwoo Kim, Aiden Carney, Ellie Brothers, Maxim Yam"
+date: "2024-05-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=F, error=F, warning=F, message=F}
+# Load packages:
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(interactions)
+library(usmap)
+library(knitr)
+library(broom)
+```
+
+```{r, echo=F, message=F}
+# load the data
+data <- read.csv("https://raw.githubusercontent.com/ajcarney/STAT333Project/master/clean_data/data.csv")
+#data <- read.csv("clean_data/data.csv")
+data <- data %>% select(-Perc_Dem, -Perc_Rep) %>% drop_na()
+```
+
+# Introduction
+
+  In today's era of heightened environmental consciousness and the need to combat climate change, the transition to electric vehicles (EV) has emerged as a pivotal solution. Electric vehicles have been featured prominently as an individual eco-friendly option to tackle climate change and are responsible for lower carbon emission across the car lifespan compared to a conventional gas powered personal use vehicle. Many politicians and environmentalists have attempted to push for the adoption of electric vehicles but have seen pushbacks by detractors, claiming that electric vehicles are too expensive and unaffordable for the common masses. Thus, we find it is imperative to understand how socio-economic factors, particularly the income levels of the individual’s county, are associated with adoption of electric vehicles in that county. 
+
+  Our research question seeks to understand the influence of the wealth of a particular county and its electric vehicle market penetration, considering varying gas prices across states. To further refine the definition of ‘wealth’, we have decided to deem it as the ratio of the median income of the county to the cost of living of the county using their Regional Price Parity.
+  
+  With the aforementioned information we have concluded the following thesis statement: Using data from the US government, in places with medium or high gas prices, US counties with a higher ratio of income to cost of living are more likely to have higher electric vehicle market penetration percentages when controlling for weather, number of public charging stations, and gas prices across states. Notably, we also posit that in places with low gas prices, we see a null relationship between the treatment variable of ratio of income to cost of living and electric vehicle market penetration percentages. 
+  
+# Methodology
+
+  This study includes EV Market Penetration, Number of EV Charging Stations, Gas Prices, Population, Unemployment, Income, Education, Weather, and Regional Price Parity (RPP) variables for analysis. All of these variables were measured by counties in the United States. 
+
+  There are many data sources we utilized. We collected the EV Market Penetration variable from the National Renewable Energy Laboratory, 2023, and the Number of EV charging stations variable from the US Department of Energy. For this variable, we only included Level 2 and DC Fast chargers to control for the quality of charging stations. Gas Prices data were scraped from AAA Gas prices. Each county used its state’s data due to a lack of availability of county data in gas price. We collected the Population, Education, Income, and Unemployment variables from the U.S. Department of Agriculture Economic Research Service. Population data is from 2020, and the others are from 2021. For population data, we took the log of the original population to deal with the nonlinear magnitudes. The Weather data is from the National Centers for Environmental Information in 2022. For the weather data, we included average, minimum, maximum temperature, and precipitation. Regional Price Parity variable was found through the U.S. Department of Commerce. This dataset takes publicly available data to weigh housing, utilities, and goods to create a regional price parity by county. 
+  
+  To test the relationship between EV Market Penetration and Income based on gas price levels while considering the potential influence of other variables mentioned above as a confounding variable, we employed multiple linear regression analysis. In the regression model, EV Market Penetration was treated as a dependent variable, and income was treated as a predictor variable. To better reflect income levels in each county, we took the logarithm of our income variable divided by the Regional Price Parity variable. 
+
+  We removed all Connecticut counties from the study. In 2022, Connecticut finalized its decision to remove counties in favor of tracking data using regional planning organizations with new borders. Because our data sources include years before and after these changes, the data sources did not consistently respect the changes leaving much of the data missing. Additionally, data for most categories could not be collected for Hawaii, so it was also removed. 
+
+# Results
+
+  The model controlled for several key factors influencing Electric Vehicle (EV) market penetration. Figure 1 shows a plot of EV market penetration versus the logarithm of median household income / regional price parity colored by gas prices. This plot shows a notable, positive correlation between county median household income (adjusted for RPP) and EV market penetration. There exists clear clustering of counties with low gas prices toward the bottom of our plot. 
+  
+```{r, echo=F, message=F, fig.align = 'center'}
+# Plot log (income / RPP)
+ggplot(data, aes(x=log_income_adjusted, y = ev_market_penetration)) +
+  geom_point(aes(color = gas_regular),position = position_jitter(width = 0.005, height = 0.005), alpha=0.5) +
+  geom_smooth(method = "lm") +
+  ggtitle("Fig. 1: Median Household Income Associated With EV Market Penetration") +
+  labs(x = "Log (Median Household Income / RPP)", y = "Electric Vehicle Market Penetration") + 
+  scale_color_continuous(name = "Average Gas Price ($/gal)") + 
+  scale_color_gradient(name = "Average Gas Price ($/gal)",
+                       low = "pink",  # lighter color
+                       high = "darkred")
+```
+
+  Figure 2 shows an interaction between household income and gas prices because of the cluster of high gas price points with high EV market penetration. As seen in the figure, those counties with gas prices around the mean or 1 standard deviation above the mean exhibit a more positive slope when compared to counties with lower gas prices. Figure 3 exhibits the same relationship when alternatively controlling for gas tax rates by state as an interaction term. 
+
+```{r fig3, echo = FALSE, out.width = "45%"}
+fit2 <- lm(ev_market_penetration ~ log_income_adjusted*gas_regular + gas_tax + n_charging_locations + CENSUS_2020_POP + avg_temp + Perc_Adults_Bachelor_Or_Above, data = data)
+interact_plot(fit2, pred = log_income_adjusted, modx = gas_regular,colors = c("darkred", "#FF5555", "#FF9999"),
+              legend.main = c("Fig. 2: Income and EVP Moderated by Gas Price"),
+              y.label = c("Electric Vehicle Market Penetration (EVP)"), x.label = c("log(Median Household Income / RPP) ($)")) +
+  theme_grey() +
+  theme(legend.position = "top")
+
+
+fit3 <- lm(ev_market_penetration ~ log_income_adjusted*gas_tax + gas_regular + n_charging_locations + CENSUS_2020_POP + avg_temp + Perc_Adults_Bachelor_Or_Above, data = data)
+interact_plot(fit3, pred = log_income_adjusted, modx = gas_tax,colors = c("darkred", "#FF5555", "#FF9999"),
+               legend.main = c("Fig. 3: Income and EVP Moderated by Gas Tax"),
+              y.label = c("Electric Vehicle Market Penetration (EVP)"), x.label = c("log(Median Household Income / RPP) ($)")) +
+  theme_grey() +
+  theme(legend.position = "top")
+```
+
+
+  Looking at Figure 4, the map of log-adjusted income shows a relatively even variation across the country. Figure 5 shows a map of EV market penetration. It can be seen that many counties in California and one county in Alaska are the areas with the most market penetration. 
+
+```{r fig2, echo=F, message=F, warning=F, out.width = "49%"}
+#Plot log income:
+plot_usmap(data = data, values="log_income_adjusted", color = "grey", size = .25, linewidth=0.1) +
+  scale_fill_gradient(low = "pink", high = "darkred", na.value = "transparent", name = "log(Income / RPP)") +
+  theme(legend.position = "right") +
+  ggtitle("Fig. 4: Log-adjusted Income Across the United States")
+
+# Plot ev market penetration on a map
+plot_usmap(data = data, values="ev_market_penetration", color = "grey", size = .25, linewidth=0.1) +
+  scale_fill_gradient(low = "pink", high = "darkred", na.value = "transparent", name = "EV Market Penetration") +
+  theme(legend.position = "right") +
+  ggtitle("Fig. 5: Electric Vehicle Market Penetration Across the United States")
+```
+
+
+  Figure 6 shows the results of fitting the linear model. Looking at the p-value for the interaction term between log-adjusted income and gas prices there is a statistically significant interaction indicating that counties with higher state gas prices have higher EV market penetration. Using the median state gas price of $3.33, for every unit increase in log-adjusted income, EV market penetration increases by 0.0031. All other confounding variables except gas tax also showed statistically significant relationships by having p-values less than 0.001. The variables of the number of charging locations, log of population, average temperature, and percentage of adults with a bachelor’s or higher all had positive relationships. For every increase in 100 charging locations, market penetration increases by 0.004. For every unit increase in the logarithm of population, market penetration increases by only 0.0018. For each ten-degree increase in average temperature, market penetration increases by 0.0053. For every percent increase in adults with a bachelor’s degree or higher, market penetration increases by 0.0015. 
+
+```{r, echo=F, message=F}
+# Run the model with log income adjusted:
+fit <- lm(ev_market_penetration ~ log_income_adjusted*gas_regular + gas_tax + n_charging_locations + log_population + avg_temp + Perc_Adults_Bachelor_Or_Above, data = data)
+
+fit %>% tidy() %>% kable(caption="Figure 6: Linear Model Summary")
+```
+
+  Diagnostic plots indicate that a few counties were key outliers in our model (see appendix A). Los Angeles County, CA, is a strong leverage point (over 0.5) because of its high EV market penetration. This data point belongs in the dataset because California as a whole has higher EV adoption than the rest of the United States. Another high-leverage point of note is Yakutat City and Borough in Alaska. This county had a very high EV market penetration but did not have a high log-adjusted income. Figure 7 shows the residuals plotted on a map by county. There is no pattern except for one county in Alaska that has a much higher residual than any other county. This is explainable by the fact that it was a high-leverage point that did not seem to fit the hypothesis. This indicates that the model accounted for metropolitan areas and geographical locations. When running our model with and without these leverage points, our slopes and p-values did not change significantly.
+
+```{r, echo=F, message=F, warning=F, fig.align = 'center'}
+# Plot residuals on a map
+data2 <- data %>% 
+  mutate(residuals = resid(fit))
+
+plot_usmap(data = data2, values="residuals", color = "grey", size = .25, linewidth=0.1) +
+  scale_fill_gradient(low = "pink", high = "darkred", na.value = "transparent", name = "Residuals") +
+  theme(legend.position = "right") + 
+  ggtitle("Fig. 7: Plotted Residuals Across the United States")
+```
+
+  
+  Our residual plots and qq-plots indicate some level of non-normality. This is likely due to the significance of outliers in our data. Some of our data points have incredibly high EV market penetration, making our data highly variable. Most of the data points with high EV penetration also have higher income, causing residuals for high income counties to be large. However, we believe that our model is of proper fit as these residuals are unavoidable because rate of electric vehicle market penetration is highly variable across the country.
+  
+# Conclusion & Limitations
+
+  This project found strong linear associations between household income and electric vehicle market penetration. We observed that US counties with a higher ratio of median household income to regional price parity (RPP) had significantly higher rates of electric vehicle market penetration. These findings were consistent with our hypothesis and stayed stable when accounting for county population, number of EV charging stations, average temperature, and level of education. Interestingly, we observed an interaction between income and price of gas in our model. This interaction was also observed when accounting for gas taxation rates.
+  
+  It is important to reflect on the limitations of our project when analyzing the results and our conclusions. Throughout the process of data collection and analysis, we encountered some main limitations: our outcome variable, unmeasured variables of government policy, political party affiliation, and environmental consciousness, potential model endogeneity, and a couple of limitations with the data.
+
+  When first creating our directed acyclic graph, we wished to measure how different income levels affect the ratio of electric vehicle usage by the number of charging stations. This is because different states may have different electric vehicle infrastructure in place, which would naturally affect the number of individuals who may be inclined to purchase and drive an electric vehicle. We wanted to account for this relationship by using a ratio as our outcome variable Unfortunately, when the number of electric vehicle charging stations was zero, this causes a zero in the denominator and not necessarily a zero in the numerator. Individuals may still drive an electric vehicle, even if there are no charging stations in their specific county. Ultimately, this caused issues with our data, and we eventually opted to use purely electric vehicle use percentage as our outcome variable while controlling for charging stations as  confounder.
+
+  Another limitation important to note is that there was no quantitative data available to control for government policies regarding sustainability and environmentally friendly initiatives. Both state and municipal locations can implement such policies, which can increase the number of both electric vehicles infrastructure and electric vehicles themselves. For example, policies can include tax reductions and subsidies for electric vehicle owners. Because we could not find data for government policy, it remains an unmeasured variable, and we could not include it in our linear regression analysis.
+
+  We also had an unmeasured variable of political party affiliation. We reasoned that it is likely that areas that have higher percentages of votes for liberal candidates would likely have both more electric vehicle usage and more sustainable political initiatives. We were able to find data from the 2020 U.S. presidential election by county that detailed percentages of Democrat and Republican voters, but it dropped our merged data set from 3000 rows to 1000 rows. We analyzed the results with and without the election data, and they remained consistent, so we opted to include more rows in our regression analysis for a larger sample size.
+
+  A third unmeasured variable in our model is how environmentally conscious the population in a given state / municipal area is. This likely also correlates with political party affiliation, but there may be some slight differences. It is difficult to find a quantitative variable of environmental consciousness, specifically when it comes to electric vehicle usage.
+
+  Another limitation discussed in class surrounding this project is that there is potentially endogeneity in the model. The different states may have different reasons for why we are seeing variation in our results. For example, different counties in California have incredibly high electric vehicle percentage rates. This endogeneity is difficult to control for and remains a limitation of our results.
+
+  We had two main limitations with the data that we did end up using. First, our data was taken from different years. That being said, our data was only taken over the span of four years of 2020 - 2023, which are very recent years. We are making the assumption that our data is up to date because the data should not have changed too much by 2024. Also, we had to remove all Connecticut and Hawaii counties from the study. We believe that our results still contain validity because only losing two states should not affect our results too much.
+
+  The above limitations of our model are important to assess when looking at our results and conclusions. This being said, we believe our results and conclusions still have validity. Between the eight datasets we used in our analysis, all contained public data and none were self-reported, which provides reassurance in the data that we did incorporate into our model. Overall, we trust the results and conclusions found, but note that there were limitations to our project.
+  
+  As electric vehicles become more efficient and infrastructure grows for their use, prices for this form of transport will surely decrease. However, the price of electric vehicles still poses a significant barrier to their widespread adoption. Our research showed that higher income is indeed associated with higher electric vehicle market penetration. These findings suggest that while electric vehicles are the future of transport, these technologies must be improved upon to deliver cheaper alternatives to current vehicles on the market to allow for widespread use.
+	
+  Differences in EV penetration rates according to gas prices and gas tax rates may be a function of several variables. It is impossible to determine causality between these variables, but the following offers some interpretation of these complex relationships.
+  
+  Firstly, high gas prices may push consumers to adopt electric vehicles in order to save money. Because of the inherent economic barriers to owning an electric vehicle, it is understandable that higher income individuals would be more likely to purchase electric vehicles when gas prices are high because they have the capital to do so in order to save money on gas in the long run. In lower income communities, however, individuals may be confined to paying steep fees for gas where they are unable to afford electric vehicles. However, regardless of income status, our research found that higher gas prices and gas taxation rates were associated with greater EV market penetration. The relationship between gas taxation rates and EV market penetration was steeper in communities with higher income; a challenge that could be overcome by offering tax incentives or funding to low income families if they adopt electric vehicles.
+  
+  Secondly, consider that states with higher gas prices also have higher gas taxation rates. High rates of taxation have been commonly associated with left-leaning political affiliation. Politically left-leaning individuals are often more concerned with the environmental impacts of carbon emissions, leading to greater adoption of electric vehicles. Further, communities with higher tax rates may have more capital to invest in infrastructure for electric vehicles, thus making the transition to electric vehicles feasible.
+
+  Overall, our findings strongly imply that electric vehicle market penetration increases as a function of income. These findings suggest a need for more equitable distribution of access to electric vehicles, such as government programs that offer tax breaks to electric vehicle users or infrastructure projects to implement high voltage charging stations. Regardless of income, our findings suggest that greater taxation on gas may catalyze the transition to electric vehicle usage regardless of income status. Many economists also suggest that the fastest way to reduce carbon emissions is to tax their production and consumption. In order to secure a carbon neutral future, we should directly invest tax revenue from carbon products into electric vehicle infrastructure.
+
+# Appendix A - Diagnostic Plots
+```{r, echo=F, message=F, fig.align = 'center'}
+# diagnostic plots
+par(mfrow = c(2,2))
+plot(fit, labels.id = data$county_name)
+```
+
+# Appendix B - Code Used
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
