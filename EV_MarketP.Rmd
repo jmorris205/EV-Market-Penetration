@@ -22,7 +22,7 @@ library(broom)
 
 ```{r, echo=F, message=F}
 # load the data
-data <- read.csv("https://raw.githubusercontent.com/ajcarney/STAT333Project/master/clean_data/data.csv")
+data <- read.csv("https://github.com/jmorris205/EV-Market-Penetration/raw/main/EV_MarketP.csv")
 #data <- read.csv("clean_data/data.csv")
 data <- data %>% select(-Perc_Dem, -Perc_Rep) %>% drop_na()
 ```
